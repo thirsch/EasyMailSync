@@ -36,7 +36,7 @@ public class Program {
 
 			for (int i = 0; i < count; i++) {
 				log("===================================================================");
-				log("Synchronise account " + i);
+				log("Synchronize account " + i);
 				log("===================================================================");
 
 				String sourceProtocol = config.getProperty(
@@ -103,14 +103,14 @@ public class Program {
 			Folder sourceFolder, Store targetStore, Folder targetFolder,
 			int level) throws MessagingException {
 
-		log("Synchronising folder %s.", sourceFolder.getFullName());
+		log("Synchronizing folder %s.", sourceFolder.getFullName());
 
 		if ((sourceFolder.getType() & Folder.HOLDS_MESSAGES) == Folder.HOLDS_MESSAGES) {
-			synchroniseMessages(sourceFolder, targetFolder, true);
+			synchronizeMessages(sourceFolder, targetFolder, true);
 		}
 
 		if ((sourceFolder.getType() & Folder.HOLDS_FOLDERS) == Folder.HOLDS_FOLDERS) {
-			log("Synchronising subfolders of %s.", sourceFolder.getName());
+			log("Synchronizing subfolders of %s.", sourceFolder.getName());
 			// follow the folders.
 			Folder[] sourceSubfolderList = sourceFolder.list();
 
@@ -128,10 +128,10 @@ public class Program {
 		}
 	}
 
-	private static void synchroniseMessages(Folder sourceFolder,
+	private static void synchronizeMessages(Folder sourceFolder,
 			Folder targetFolder, boolean replicateOnly)
 			throws MessagingException {
-		log("Synchronising messages in folder %s.", sourceFolder.getName());
+		log("Synchronizing messages in folder %s.", sourceFolder.getName());
 
 		sourceFolder.open(Folder.READ_ONLY);
 		targetFolder.open(Folder.READ_WRITE);
