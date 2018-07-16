@@ -1,22 +1,11 @@
 package de.thirsch.imapsync;
 
+import javax.mail.*;
+import javax.mail.internet.MimeMessage;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
-import java.util.Enumeration;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Properties;
-import java.util.Set;
-
-import javax.mail.FetchProfile;
-import javax.mail.Flags;
-import javax.mail.Folder;
-import javax.mail.Header;
-import javax.mail.Message;
-import javax.mail.MessagingException;
-import javax.mail.Session;
-import javax.mail.Store;
+import java.util.*;
 
 public class Program {
 
@@ -124,14 +113,13 @@ public class Program {
     }
 
     private static void synchronizeMessages(Folder sourceFolder, Folder targetFolder, boolean replicateOnly) throws MessagingException {
-        sourceFolder.open(Folder.READ_ONLY);
-        targetFolder.open(Folder.READ_WRITE);
-
-        Map<String, Message> sourceMessages = getMessages(sourceFolder, true);
-        Map<String, Message> targetMessages = getMessages(targetFolder, false);
+        Map<String, Message> sourceMessages = getMessages(sourceFolder, Folder.READ_ONLY, true);
+        Map<String, Message> targetMessages = getMessages(targetFolder, Folder.READ_WRITE, false);
 
         Set<String> itemsToRemove = targetMessages.keySet();
         for (String messageId : sourceMessages.keySet()) {
+
+            log("Processing message with id %s.", messageId);
 
             boolean exists = false;
             for (String key : targetMessages.keySet()) {
@@ -144,7 +132,11 @@ public class Program {
 
             if (!exists) {
                 log("Create message %s in target store.", messageId);
-                Message message = sourceMessages.get(messageId);
+                Message message = new MimeMessage((MimeMessage)sourceMessages.get(messageId));
+
+                if(message.getHeader("Message-ID") == null) {
+                    message.setHeader("Message-ID", messageId);
+                }
 
                 targetFolder.appendMessages(new Message[] {message});
             }
@@ -164,13 +156,17 @@ public class Program {
     }
 
     @SuppressWarnings("unchecked")
-    private static Map<String, Message> getMessages(Folder sourceFolder, boolean logCount) throws MessagingException {
+    private static Map<String, Message> getMessages(Folder sourceFolder, int mode, boolean logCount) throws MessagingException {
+        UIDFolder uidFolder = (UIDFolder)sourceFolder;
+        sourceFolder.open(mode);
+
         Map<String, Message> result = new HashMap<String, Message>();
 
         Message[] messages = sourceFolder.getMessages();
 
         FetchProfile fp = new FetchProfile();
         fp.add(FetchProfile.Item.ENVELOPE);
+        fp.add(UIDFolder.FetchProfileItem.UID);
         fp.add("Message-ID");
         sourceFolder.fetch(messages, fp);
 
@@ -178,14 +174,24 @@ public class Program {
             log("Processing %d messages...", messages.length);
         }
 
+        boolean headerFound = false;
+
         for (Message message : messages) {
+            long uid = uidFolder.getUID(message);
+
             Enumeration<Header> headers = message.getAllHeaders();
             while (headers.hasMoreElements()) {
                 Header nextElement = headers.nextElement();
                 if ("Message-ID".equalsIgnoreCase(nextElement.getName())) {
                     result.put(nextElement.getValue(), message);
+                    headerFound = true;
                     break;
                 }
+            }
+
+            if(!headerFound) {
+                // No header has been found. Inserting our own, to allow synchronisation.
+                result.put(String.format("%d@easymailsync", uid), message);
             }
         }
 
