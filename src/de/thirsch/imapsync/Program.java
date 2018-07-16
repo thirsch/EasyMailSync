@@ -9,9 +9,6 @@ import java.util.*;
 
 public class Program {
 
-    /**
-     * @param args
-     */
     public static void main(String[] args) {
         Properties props = System.getProperties();
         props.setProperty("mail.store.protocol", "imaps");
@@ -68,7 +65,7 @@ public class Program {
                     log("Connected target to %s", targetStore);
                     log("===================================================================");
 
-                    synchronizeMails(sourceStore, sourceStore.getDefaultFolder(), targetStore, targetStore.getDefaultFolder(), 0);
+                    synchronizeMails(sourceStore.getDefaultFolder(), targetStore, targetStore.getDefaultFolder(), 0);
 
                     targetStore.close();
                     sourceStore.close();
@@ -89,12 +86,12 @@ public class Program {
         }
     }
 
-    private static void synchronizeMails(Store sourceStore, Folder sourceFolder, Store targetStore, Folder targetFolder, int level) throws MessagingException {
+    private static void synchronizeMails(Folder sourceFolder, Store targetStore, Folder targetFolder, int level) throws MessagingException {
 
         log("Synchronizing folder %s.", sourceFolder.getFullName());
 
         if ((sourceFolder.getType() & Folder.HOLDS_MESSAGES) == Folder.HOLDS_MESSAGES) {
-            synchronizeMessages(sourceFolder, targetFolder, true);
+            synchronizeMessages(sourceFolder, targetFolder);
         }
 
         if ((sourceFolder.getType() & Folder.HOLDS_FOLDERS) == Folder.HOLDS_FOLDERS) {
@@ -107,12 +104,12 @@ public class Program {
                     log("Creating folder %s in target store.", source.getName());
                     targetSubfolder.create(Folder.HOLDS_MESSAGES);
                 }
-                synchronizeMails(sourceStore, source, targetStore, targetSubfolder, level + 1);
+                synchronizeMails(source, targetStore, targetSubfolder, level + 1);
             }
         }
     }
 
-    private static void synchronizeMessages(Folder sourceFolder, Folder targetFolder, boolean replicateOnly) throws MessagingException {
+    private static void synchronizeMessages(Folder sourceFolder, Folder targetFolder) throws MessagingException {
         Map<String, Message> sourceMessages = getMessages(sourceFolder, Folder.READ_ONLY, true);
         Map<String, Message> targetMessages = getMessages(targetFolder, Folder.READ_WRITE, false);
 
@@ -142,33 +139,23 @@ public class Program {
             }
         }
 
-        if (!replicateOnly) {
-            for (String key : itemsToRemove) {
-                log("Remove message %s", key);
-
-                Message message = targetMessages.get(key);
-                message.setFlag(Flags.Flag.DELETED, true);
-            }
-        }
-
         targetFolder.close(true);
         sourceFolder.close(true);
     }
 
-    @SuppressWarnings("unchecked")
-    private static Map<String, Message> getMessages(Folder sourceFolder, int mode, boolean logCount) throws MessagingException {
-        UIDFolder uidFolder = (UIDFolder)sourceFolder;
-        sourceFolder.open(mode);
+    private static Map<String, Message> getMessages(Folder folder, int mode, boolean logCount) throws MessagingException {
+        UIDFolder uidFolder = (UIDFolder)folder;
+        folder.open(mode);
 
-        Map<String, Message> result = new HashMap<String, Message>();
+        Map<String, Message> result = new HashMap<>();
 
-        Message[] messages = sourceFolder.getMessages();
+        Message[] messages = folder.getMessages();
 
         FetchProfile fp = new FetchProfile();
         fp.add(FetchProfile.Item.ENVELOPE);
         fp.add(UIDFolder.FetchProfileItem.UID);
         fp.add("Message-ID");
-        sourceFolder.fetch(messages, fp);
+        folder.fetch(messages, fp);
 
         if (logCount) {
             log("Processing %d messages...", messages.length);
@@ -179,9 +166,9 @@ public class Program {
         for (Message message : messages) {
             long uid = uidFolder.getUID(message);
 
-            Enumeration<Header> headers = message.getAllHeaders();
+            Enumeration headers = message.getAllHeaders();
             while (headers.hasMoreElements()) {
-                Header nextElement = headers.nextElement();
+                Header nextElement = (Header)headers.nextElement();
                 if ("Message-ID".equalsIgnoreCase(nextElement.getName())) {
                     result.put(nextElement.getValue(), message);
                     headerFound = true;
