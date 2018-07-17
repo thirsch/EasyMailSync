@@ -9,6 +9,8 @@ import java.util.*;
 
 public class Program {
 
+    private static int totalMails = 0;
+
     public static void main(String[] args) {
         Properties props = System.getProperties();
         props.setProperty("mail.store.protocol", "imaps");
@@ -75,7 +77,7 @@ public class Program {
                 }
             }
 
-            log("Done!");
+            log("Done! %d mails synchronised...", totalMails);
             log("  Bye...");
         } catch (FileNotFoundException e) {
             e.printStackTrace();
@@ -113,10 +115,11 @@ public class Program {
         Map<String, Message> sourceMessages = getMessages(sourceFolder, Folder.READ_ONLY, true);
         Map<String, Message> targetMessages = getMessages(targetFolder, Folder.READ_WRITE, false);
 
+        int currentMessage = 0;
         Set<String> itemsToRemove = targetMessages.keySet();
         for (String messageId : sourceMessages.keySet()) {
 
-            log("Processing message with id %s.", messageId);
+            log("  %.2f %d/%d: Processing message with id %s.", ++currentMessage * 100 / (float)sourceMessages.size(), currentMessage, sourceMessages.size(), messageId);
 
             boolean exists = false;
             for (String key : targetMessages.keySet()) {
@@ -128,7 +131,7 @@ public class Program {
             }
 
             if (!exists) {
-                log("Create message %s in target store.", messageId);
+                log("  Create message %s in target store.", messageId);
                 Message message = new MimeMessage((MimeMessage)sourceMessages.get(messageId));
 
                 if(message.getHeader("Message-ID") == null) {
@@ -136,6 +139,7 @@ public class Program {
                 }
 
                 targetFolder.appendMessages(new Message[] {message});
+                ++totalMails;
             }
         }
 
